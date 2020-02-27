@@ -1004,6 +1004,7 @@ static int get_l2cap_conn(char *buf, bdaddr_t *addr, u8 *addr_type,
 	struct hci_conn *hcon;
 	struct hci_dev *hdev;
 	int n;
+	u8 hci_addr_type;
 
 	n = sscanf(buf, "%hhx:%hhx:%hhx:%hhx:%hhx:%hhx %hhu",
 		   &addr->b[5], &addr->b[4], &addr->b[3],
@@ -1013,13 +1014,27 @@ static int get_l2cap_conn(char *buf, bdaddr_t *addr, u8 *addr_type,
 	if (n < 7)
 		return -EINVAL;
 
+	if (bdaddr_type_is_le(*addr_type)) {
+		/* Convert from L2CAP channel address type to HCI address type
+		 */
+		if (*addr_type == BDADDR_LE_PUBLIC) {
+			hci_addr_type = ADDR_LE_DEV_PUBLIC;
+		}
+		else {
+			hci_addr_type = ADDR_LE_DEV_RANDOM;
+		}
+	}
+	else {
+		return -EINVAL;
+	}
+
 	/* The LE_PUBLIC address type is ignored because of BDADDR_ANY */
 	hdev = hci_get_route(addr, BDADDR_ANY, BDADDR_LE_PUBLIC);
 	if (!hdev)
 		return -ENOENT;
 
 	hci_dev_lock(hdev);
-	hcon = hci_conn_hash_lookup_le(hdev, addr, *addr_type);
+	hcon = hci_conn_hash_lookup_le(hdev, addr, hci_addr_type);
 	hci_dev_unlock(hdev);
 
 	if (!hcon)
@@ -1130,7 +1145,7 @@ static ssize_t lowpan_control_write(struct file *fp,
 				    size_t count,
 				    loff_t *position)
 {
-	char buf[32];
+	char buf[64];
 	size_t buf_size = min(count, sizeof(buf) - 1);
 	int ret;
 	bdaddr_t addr;
