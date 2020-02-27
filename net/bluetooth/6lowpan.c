@@ -173,7 +173,7 @@ static inline struct lowpan_peer *peer_lookup_dst(struct lowpan_btle_dev *dev,
 	struct lowpan_peer *peer;
 	struct neighbour *neigh;
 
-	BT_DBG("peers %d addr %pI6c rt %p", count, daddr, rt);
+	BT_DBG("peers %d addr %pI6c rt %p gw %pI6c", count, daddr, rt, &lowpan_cb(skb)->gw);
 
 	if (!rt) {
 		if (ipv6_addr_any(&lowpan_cb(skb)->gw)) {
@@ -184,7 +184,12 @@ static inline struct lowpan_peer *peer_lookup_dst(struct lowpan_btle_dev *dev,
 		} else {
 			/* There is a known gateway
 			 */
-			nexthop = &lowpan_cb(skb)->gw;
+			if (lowpan_cb(skb)->gw.s6_addr32[0] != 0) {
+				nexthop = &lowpan_cb(skb)->gw;
+			}
+			else {
+				nexthop = daddr;
+			}
 		}
 	} else {
 		nexthop = rt6_nexthop(rt, daddr);
